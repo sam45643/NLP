@@ -1,37 +1,56 @@
-﻿// Add necessary using statements
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision;
-using Microsoft.Azure.CognitiveServices.Vision.ComputerVision.Models;
+﻿using System;
+using System.IO;
+using System.Threading.Tasks;
+using Microsoft.CognitiveServices.Speech;
+using Microsoft.CognitiveServices.Speech.Audio;
 
 class Program
 {
-    static async Task Main(string[] args)
+
+    static string speechKey = "e71030b6f92147a5ac77973d247f8b3d";
+    static string speechRegion = "eastus";
+
+    static void OutputSpeechSynthesisResult(SpeechSynthesisResult speechSynthesisResult, string text)
     {
-        string subscriptionKey = "800157e6cf96432a8958603d45173bed";
-        string endpoint = "https://new333.cognitiveservices.azure.com/";
-
-        var client = new ComputerVisionClient(new ApiKeyServiceClientCredentials(subscriptionKey))
+        switch (speechSynthesisResult.Reason)
         {
-            Endpoint = endpoint
-        };
+            case ResultReason.SynthesizingAudioCompleted:
+                Console.WriteLine($"Speech synthesized for text: [{text}]");
+                break;
+            case ResultReason.Canceled:
+                var cancellation = SpeechSynthesisCancellationDetails.FromResult(speechSynthesisResult);
+                Console.WriteLine($"CANCELED: Reason={cancellation.Reason}");
 
-        string localImagePath = @"C:\Users\samde\Downloads\20240327_170557.jpg";
-
-        using (var imageStream = File.OpenRead(localImagePath))
-        {
-            var result = await client.RecognizePrintedTextInStreamAsync(true, imageStream);
-
-            foreach (var region in result.Regions)
-            {
-                foreach (var line in region.Lines)
+                if (cancellation.Reason == CancellationReason.Error)
                 {
-                    foreach (var word in line.Words)
-                    {
-                        Console.Write(word.Text + " ");
-                    }
-                    Console.WriteLine();
+                    Console.WriteLine($"CANCELED: ErrorCode={cancellation.ErrorCode}");
+                    Console.WriteLine($"CANCELED: ErrorDetails=[{cancellation.ErrorDetails}]");
+                    Console.WriteLine($"CANCELED: Did you set the speech resource key and region values?");
                 }
-            }
+                break;
+            default:
+                break;
         }
     }
-}
 
+    async static Task Main(string[] args)
+    {
+        var speechConfig = SpeechConfig.FromSubscription(speechKey, speechRegion);
+
+
+        speechConfig.SpeechSynthesisVoiceName = "en-US-AvaMultilingualNeural";
+
+        using (var speechSynthesizer = new SpeechSynthesizer(speechConfig))
+        {
+
+            Console.WriteLine("Enter some text that you want to speak >");
+            string text = Console.ReadLine();
+
+            var speechSynthesisResult = await speechSynthesizer.SpeakTextAsync(text);
+            OutputSpeechSynthesisResult(speechSynthesisResult, text);
+        }
+
+        Console.WriteLine("Press any key to exit...");
+        Console.ReadKey();
+    }
+}
